@@ -1,0 +1,54 @@
+#!/bin/bash
+
+source `dirname $0`/head.sh
+
+echo "1.mkdir dir /media/os ......"
+mkdir -p /media/os
+
+echo "2.rm /etc/yum.repos.d/* ......"
+rm -rf /etc/yum.repos.d/*
+
+echo "3.mount iso ......"
+mount -o loop -t iso9660 $cdpath  /media/os
+
+echo "4.create os.repo file version ......"
+echo "[os]
+name=os
+baseurl=file:///media/os
+enabled=1
+gpgcheck=0" >> /etc/yum.repos.d/OS.repo
+
+echo "5.install httpd ......"
+if [[ `rpm -qa httpd` ]]; then
+  echo "the httpd service already install!"
+  systemctl restart httpd
+  echo "httpd has been installed and restart!"
+else  
+  yum install httpd -y > /dev/null 2>&1
+  if [ $? -eq 0 ]; then
+    echo "yum install httpd successfull"
+  else
+    echo "yum install httpd fail"
+    exit 1
+  fi
+fi
+systemctl restart httpd
+echo "restart httpd successfull"
+
+echo "6.mount OS ISO  to  var www html os ......"
+mkdir -p /var/www/html/os
+mount $cdpath /var/www/html/os
+echo "mount OS ISO to var www html os successfull"
+
+echo "setup automatic mount for OS ISO, begin..."
+line_count=`grep -c "${cdpath}" /etc/fstab`
+if [ ${line_count} -gt 0 ]; then
+  echo "The OS ISO has been setup automatic mount in /etc/fstab, nothing to do"
+else
+  echo "${cdpath}  /var/www/html/os   iso9660 defaults  0 0" >> /etc/fstab
+fi
+echo "setup automatic mount successfull"
+
+echo "7.update os.repos  http version ......"
+sed -i  "s/file:\/\/\/media/http:\/\/`hostname`/g" /etc/yum.repos.d/OS.repo
+echo "update os.repos  http version successfull"

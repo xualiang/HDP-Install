@@ -1,0 +1,36 @@
+#!/bin/bash
+
+if [ -z $1 ]; then
+  echo "Please Enter the master host name"
+  exit 1
+else
+  master_name=$1
+fi
+
+source `dirname $0`/head.sh
+
+
+#如果当前节点是chrony server，则不需要设置chrony agent
+if [ "`hostname`" = "${master_name}" ]; then
+
+  echo "This is chrony server node, can not setup chrony agent"
+
+else
+
+  run "yum install chrony.x86_64 -y > /dev/null 2>&1"
+
+#如果当前节点已经设置过chrony.conf，不需要再次设置
+  line_count=`grep -c "server ${master_name}" /etc/chrony.conf`
+  if [ ${line_count} -gt 0 ]; then
+    echo "The file chrony.conf has already setup, nothing to do"
+  else
+    sed -i "s/^server/#server/g" /etc/chrony.conf
+    echo "server ${master_name} iburst" >> /etc/chrony.conf
+  fi
+  
+  systemctl stop ntpd.service
+  systemctl disable ntpd.service
+  systemctl restart chronyd.service 
+  systemctl enable chronyd.service 
+  
+fi

@@ -1,0 +1,24 @@
+#!/bin/bash
+
+source `dirname $0`/head.sh
+
+run "yum install chrony.x86_64 -y > /dev/null 2>&1"
+
+#如果当前节点已经设置过chrony.conf，不需要再次设置
+line_count=`grep -c "server  127.127.1.0" /etc/chrony.conf`
+if [ ${line_count} -gt 0 ]; then
+  echo "The file chrony.conf has already setup, nothing to do"
+else
+
+  sed -i "s/#local stratum/local stratum/g" /etc/chrony.conf
+  sed -i "s/#allow.*$/allow all/g" /etc/chrony.conf
+    
+  echo "server 127.127.1.0 iburst" >> /etc/chrony.conf
+
+fi
+
+systemctl stop ntpd.service
+systemctl disable ntpd.service
+systemctl restart chronyd.service
+systemctl enable chronyd.service
+

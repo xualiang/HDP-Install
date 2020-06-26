@@ -1,0 +1,34 @@
+#!/bin/bash
+
+source `dirname $0`/head.sh
+
+# 解压缩
+if [ `ls ${basedir}/jdk*/bin/java` ]; then
+  echo "${jdkpath} already decompress to ${basedir}"
+else
+  tar -xf $jdkpath -C ${basedir}
+  if [ $? -gt 0 ]; then
+    echo "decompress fail"
+    exit 1
+  else
+    echo "decompress successfull"
+  fi
+fi
+
+jdkhome=`ls ${basedir}/ | grep jdk`
+
+#set environment  
+JAVA_HOME="${basedir}/$jdkhome" 
+echo "jdk homepath:$JAVA_HOME"
+if [ `grep -c "JAVA_HOME=${JAVA_HOME}" /etc/profile` -eq 0 ]; then  
+    echo "export JAVA_HOME=${JAVA_HOME}" >> /etc/profile  
+    echo "export PATH=\$JAVA_HOME/bin:\$PATH" >> /etc/profile  
+    echo "export CLASSPATH=.:\$JAVA_HOME/lib:\$CLASSPATH" >> /etc/profile  
+else
+  echo "Environment /etc/profile already setup, Nothing need to do"
+fi
+
+run source /etc/profile
+run ln -sf $JAVA_HOME/bin/java /usr/bin/java
+
+run unzip -o -j -q ${jce_policy_zip} -d ${JAVA_HOME}/jre/lib/security/

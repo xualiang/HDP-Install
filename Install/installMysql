@@ -1,0 +1,46 @@
+#!/bin/bash
+
+source `dirname $0`/head.sh
+
+mariah=`rpm -qa | grep mariadb`
+if [ ! "x${mariah}" = "x" ]; then
+  run rpm --nodeps -e $mariah
+fi
+
+run "yum install mysql-community-server.x86_64 -y > /dev/null 2>&1"
+run "yum install mysql-community-devel.x86_64 -y > /dev/null 2>&1"
+run "yum install mysql-community-embedded.x86_64 -y > /dev/null 2>&1"
+run "yum install net-tools.x86_64 -y > /dev/null 2>&1"
+run "yum install perl-DBI.x86_64 -y > /dev/null 2>&1"
+
+systemctl start mysqld.service
+
+mysql_tmp_pass=`grep 'temporary password' /var/log/mysqld.log |awk -F'root@localhost: ' '{print $2}'`
+mysql_root_pass="1qaz@WSX"
+mysql_hive_user="hive"
+mysql_hive_pass="1qaz@WSX"
+local_hostname="`hostname`"
+hive_database="hive"
+
+mysql -uroot -p"${mysql_tmp_pass}" -Dmysql -e 'select 1'
+if [ $? -eq 0 ]; then
+  mysql -uroot -p"${mysql_tmp_pass}" --connect-expired-password -e"alter user root@localhost identified by '${mysql_root_pass}'"
+else
+  echo "MySQL Password for user root already changed, northing need to do!"
+fi
+
+mysql -u"${mysql_hive_user}" -p"${mysql_hive_pass}" -D"${hive_database}" -e 'select 1'
+if [ $? -ne 0 ]; then
+  mysql -uroot -p"${mysql_root_pass}"<<EOF
+    CREATE USER '${mysql_hive_user}'@'localhost' IDENTIFIED BY '${mysql_hive_pass}';
+    CREATE USER '${mysql_hive_user}'@'%' IDENTIFIED BY '${mysql_hive_pass}';
+    CREATE USER '${mysql_hive_user}'@'${local_hostname}' IDENTIFIED BY '${mysql_hive_pass}';
+    GRANT ALL PRIVILEGES ON *.* TO '${mysql_hive_user}'@'localhost';
+    GRANT ALL PRIVILEGES ON *.* TO '${mysql_hive_user}'@'%';
+    GRANT ALL PRIVILEGES ON *.* TO '${mysql_hive_user}'@'${local_hostname}';
+    FLUSH PRIVILEGES;
+    create database ${hive_database};
+EOF
+else
+  echo "User hive and database hive already created, northing need to do!"
+fi
